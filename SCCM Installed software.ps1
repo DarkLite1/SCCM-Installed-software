@@ -21,8 +21,8 @@ Param (
     [String]$ScriptName = 'SCCM Installed software',
     [Parameter(Mandatory)]
     [String]$ImportFile,
-    [String]$LogFolder = $env:POWERSHELL_LOG_FOLDER,
-    [String]$ScriptAdmin = $env:POWERSHELL_SCRIPT_ADMIN
+    [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\SCCM Reports\SCCM Installed software\$ScriptName",
+    [String[]]$ScriptAdmin = $env:POWERSHELL_SCRIPT_ADMIN
 )
 
 Begin {
@@ -44,16 +44,21 @@ Begin {
         #endregion
 
         #region Logging
-        $LogParams = @{
-            LogFolder    = New-FolderHC -Path $LogFolder -ChildPath "SCCM Reports\SCCM Installed software\$ScriptName"
-            Name         = $ScriptName
-            Date         = 'ScriptStartTime'
-            NoFormatting = $true
+        try {
+            $logParams = @{
+                LogFolder    = New-Item -Path $LogFolder -ItemType 'Directory' -Force -ErrorAction 'Stop'
+                Name         = $ScriptName
+                Date         = 'ScriptStartTime'
+                NoFormatting = $true
+            }
+            $logFile = New-LogFileNameHC @LogParams
         }
-        $LogFile = New-LogFileNameHC @LogParams
+        Catch {
+            throw "Failed creating the log folder '$LogFolder': $_"
+        }
+        #endregion
 
         $MachineFolder = New-Item -Path "$LogFile - Machines" -ItemType Directory
-        #endregion
 
         $MailParams = @{
             To          = $MailTo

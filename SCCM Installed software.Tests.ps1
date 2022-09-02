@@ -73,7 +73,7 @@ OU=XXX,OU=EU,DC=contoso,DC=net
     $testParams = @{
         ScriptName = 'Test (Brecht)'
         ImportFile = $testOutParams.FilePath
-        LogFolder  = New-Item 'TestDrive:/log' -ItemType Directory
+        LogFolder  = 'TestDrive:/log'
     }
   
     Mock Get-ADComputerHC
@@ -139,10 +139,10 @@ OU=XXX,OU=EU,DC=contoso,DC=net
         It 'folder not found' {
             $testImportFile | Out-File @testOutParams
           
-            .$testScript -ScriptName $testParams.ScriptName -LogFolder 'NonExisting' -ImportFile $testParams.ImportFile
+            .$testScript -ScriptName $testParams.ScriptName -LogFolder 'x:\NonExisting' -ImportFile $testParams.ImportFile
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                (&$MailAdminParams) -and ($Message -like "*Path*not found")
+                (&$MailAdminParams) -and ($Message -like "*Failed creating the log folder 'x:\NonExisting'*")
             }
         } 
     }
@@ -152,7 +152,7 @@ Describe 'export Excel files' {
         $testImportFile | Out-File @testOutParams
     }
     BeforeEach {
-        Remove-Item "$($testParams.LogFolder)\*" -Recurse -Force
+        Remove-Item "$($testParams.LogFolder)\*" -Recurse -Force -EA Ignore
     }
     It 'one file for each computer with its software in the machines folder' {
         Mock Get-ADComputerHC {
@@ -165,16 +165,17 @@ Describe 'export Excel files' {
         .$testScript @testParams
 
         $testMachines = @($testInstalledSoftware.ComputerName | 
-        Sort-Object -Unique).Count
+            Sort-Object -Unique).Count
 
         $testMachines | Should -Not -BeExactly 0
 
         Get-ChildItem $testParams.LogFolder -Recurse -Directory |
         Where-Object { $_.Name -like '*Machines' } | Get-ChildItem -File |
         Where-Object { 
-            $testInstalledSoftware.ComputerName -contains $_.BaseName } |
+            $testInstalledSoftware.ComputerName -contains $_.BaseName
+        } |
         Should -HaveCount $testMachines
-    } 
+    }
     It 'one overview file for all SCCM software installed' {
         Mock Get-ADComputerHC {
             $testADComputers
@@ -211,7 +212,7 @@ Describe 'send mail' {
         $testImportFile | Out-File @testOutParams
     }
     BeforeEach {
-        Remove-Item "$($testParams.LogFolder)\*" -Recurse -Force
+        Remove-Item "$($testParams.LogFolder)\*" -Recurse -Force -EA Ignore
     }
     It "with the 'AD Computers' and 'All installed software' in attachment" {
         Mock Get-ADComputerHC {
