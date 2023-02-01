@@ -101,7 +101,8 @@ OU=XXX,OU=EU,DC=contoso,DC=net
                 'OU=XXX,OU=EU,DC=contoso,DC=net'
             )
 
-            Assert-Equivalent -Actual $File -Expected $Expected
+            $File | Should -BeExactly $Expected
+            # Assert-Equivalent -Actual $File -Expected $Expected
         } 
         It 'mandatory parameter' {
             (Get-Command $testScript).Parameters['ImportFile'].Attributes.Mandatory | Should -Be $true
