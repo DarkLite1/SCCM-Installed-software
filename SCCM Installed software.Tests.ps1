@@ -2,10 +2,6 @@
 #Requires -Version 5.1
 
 BeforeAll {
-    $MailAdminParams = {
-        ($To -eq $ScriptAdmin) -and ($Priority -eq 'High') -and ($Subject -eq 'FAILURE')
-    }
-
     $testImportFile = @"
 MailTo: Brecht.Gijbels@heidelbergcement.com
 OU=XXX,OU=EU,DC=contoso,DC=net
@@ -71,9 +67,15 @@ OU=XXX,OU=EU,DC=contoso,DC=net
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
 
     $testParams = @{
-        ScriptName = 'Test (Brecht)'
-        ImportFile = $testOutParams.FilePath
-        LogFolder  = 'TestDrive:/log'
+        ScriptName  = 'Test (Brecht)'
+        ImportFile  = $testOutParams.FilePath
+        ScriptAdmin = 'admin@contoso.com'
+        LogFolder   = 'TestDrive:/log'
+    }
+
+    $MailAdminParams = {
+        ($To -eq $testParams.ScriptAdmin) -and ($Priority -eq 'High') -and 
+        ($Subject -eq 'FAILURE')
     }
   
     Mock Get-ADComputerHC
@@ -107,7 +109,11 @@ OU=XXX,OU=EU,DC=contoso,DC=net
             (Get-Command $testScript).Parameters['ImportFile'].Attributes.Mandatory | Should -Be $true
         } 
         It 'file not found' {
-            .$testScript -ScriptName $testParams.ScriptName -LogFolder $testParams.LogFolder -ImportFile 'NotExisting.txt'
+            $testNewParams = $testParams.Clone()
+            $testNewParams.ImportFile = 'NotExisting.txt'
+
+            .$testScript @testNewParams
+
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
                 (&$MailAdminParams) -and ($Message -like "Cannot find path*")
             }
@@ -137,9 +143,12 @@ OU=XXX,OU=EU,DC=contoso,DC=net
     }
     Context 'LogFolder' {
         It 'folder not found' {
+            $testNewParams = $testParams.Clone()
+            $testNewParams.LogFolder = 'x:\NonExisting'
+
             $testImportFile | Out-File @testOutParams
           
-            .$testScript -ScriptName $testParams.ScriptName -LogFolder 'x:\NonExisting' -ImportFile $testParams.ImportFile
+            .$testScript @testNewParams
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
                 (&$MailAdminParams) -and ($Message -like "*Failed creating the log folder 'x:\NonExisting'*")
