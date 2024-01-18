@@ -39,18 +39,6 @@ Begin {
         Write-EventLog @EventStartParams
         Get-ScriptRuntimeHC -Start
 
-        #region Import input file
-        $File = Get-Content $ImportFile -Raw -EA Stop | ConvertFrom-Json
-
-        if (-not ($MailTo = $File.MailTo)) {
-            throw "Input file '$ImportFile': No 'MailTo' addresses found."
-        }
-
-        if (-not ($OUs = $File.AD.OU)) {
-            throw "Input file '$ImportFile': No 'AD.OU' found."
-        }
-        #endregion
-
         #region Logging
         try {
             $logParams = @{
@@ -63,6 +51,18 @@ Begin {
         }
         Catch {
             throw "Failed creating the log folder '$LogFolder': $_"
+        }
+        #endregion
+
+        #region Import input file
+        $File = Get-Content $ImportFile -Raw -EA Stop | ConvertFrom-Json
+
+        if (-not ($MailTo = $File.MailTo)) {
+            throw "Input file '$ImportFile': No 'MailTo' addresses found."
+        }
+
+        if (-not ($OUs = $File.AD.OU)) {
+            throw "Input file '$ImportFile': No 'AD.OU' found."
         }
         #endregion
 
