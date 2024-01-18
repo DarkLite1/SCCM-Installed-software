@@ -1,14 +1,19 @@
+#Requires -Version 5.1
+#Requires -Modules ImportExcel
+#Requires -Modules Toolbox.HTML, Toolbox.EventLog, Toolbox.SCCM
+#Requires -Modules Toolbox.ActiveDirectory
+
 <#
     .SYNOPSIS
         Report about all computers found in AD and their software.
 
     .DESCRIPTION
-        The AD is queried  to retrieve all computer names and properties. This 
-        list is then used to query SCCM to find out the software installed on 
+        The AD is queried  to retrieve all computer names and properties. This
+        list is then used to query SCCM to find out the software installed on
         these machines.
 
     .PARAMETER ImportFile
-        Contains all the organizational units where we need to search and the 
+        Contains all the organizational units where we need to search and the
         e-mail addresses of whom to inform.
 
     .PARAMETER LogFolder
@@ -82,7 +87,7 @@ Begin {
 
 Process {
     Try {
-        $Computers = Get-ADComputerHC -OU $OUs -EA Stop | 
+        $Computers = Get-ADComputerHC -OU $OUs -EA Stop |
         Where-Object { $_.Enabled }
 
         Write-EventLog @EventVerboseParams -Message "$(@($Computers).count) enabled computers found in AD"
@@ -90,7 +95,7 @@ Process {
         if ($Computers) {
             #region SCCM Primary device user
             $SCCMDeviceUsers = Get-SCCMPrimaryDeviceUsersHC -EA Stop |
-            Where-Object { $Computers.Name -contains $_.ComputerName } | 
+            Where-Object { $Computers.Name -contains $_.ComputerName } |
             Group-Object ComputerName
             Write-EventLog @EventVerboseParams -Message "$(@($SCCMDeviceUsers).count) devices found in SCCM with primary users"
             #endregion
@@ -123,7 +128,7 @@ Process {
                 #endregion
 
                 #region Export SCCM ProductName of all machines to one sheet
-                $ProductNamesAll = $SCCMsoftware.Group | 
+                $ProductNamesAll = $SCCMsoftware.Group |
                 Group-Object ProductName | Sort-Object Name |
                 Select-Object @{N = 'ProductName'; E = { $_.Name } },
                 @{N = 'ComputerCount'; E = { $_.Count } },
@@ -145,9 +150,9 @@ Process {
                 $MailParams.Attachments += $ExcelParams.Path
 
                 #region Export SCCM ProductName and version of all machines to one sheet
-                $ProductVersionsAll = $SCCMsoftware.Group | 
+                $ProductVersionsAll = $SCCMsoftware.Group |
                 Group-Object ProductName, ProductVersion |
-                Sort-Object Name | 
+                Sort-Object Name |
                 Select-Object @{N = 'ProductName, ProductVersion'; E = { $_.Name } },
                 @{N = 'ComputerCount'; E = { $_.Count } },
                 @{N = 'ComputerName'; E = { $_.Group.ComputerName -join ', ' } }
@@ -279,7 +284,7 @@ Process {
                 NoNumberConversion = 'SCCM IP', 'DNS IP', 'Subnet'
                 ErrorAction        = 'Stop'
             }
-            $Excel = $ADComputers | Sort-Object Name | 
+            $Excel = $ADComputers | Sort-Object Name |
             Export-Excel @ExcelParams -PassThru
 
             $sheet = $Excel.Workbook.Worksheets | Select-Object -First 1
@@ -288,7 +293,7 @@ Process {
             $CountColumn = 3
 
             foreach (
-                $row in 
+                $row in
                 (($sheet.Dimension.Start.Row + 1) .. $sheet.Dimension.End.Row)
             ) {
                 if (
@@ -298,14 +303,14 @@ Process {
                     $Value = $sheet.Cells[$row, $CountColumn].Value
                     $sheet.cells[$row, $CountColumn].Hyperlink = $Link
                     $sheet.cells[$row, $CountColumn].Value = $Value
-                    $sheet.cells[$row, $CountColumn] | 
+                    $sheet.cells[$row, $CountColumn] |
                     Set-ExcelRange -Underline -FontColor Blue
                 }
             }
 
-            $sheet.Column($ComputerNameColumn) | 
+            $sheet.Column($ComputerNameColumn) |
             Set-ExcelRange -HorizontalAlignment Center
-            $sheet.Column($CountColumn) | 
+            $sheet.Column($CountColumn) |
             Set-ExcelRange -HorizontalAlignment Center
             $sheet.Column(2) | Set-ExcelRange -HorizontalAlignment Center
             $sheet.Column(4) | Set-ExcelRange -HorizontalAlignment Center
@@ -316,7 +321,7 @@ Process {
 
             #region Export SCCM Primary device user
             if (
-                $MultipleMachineUsers = $SCCMDeviceUsers.Group | 
+                $MultipleMachineUsers = $SCCMDeviceUsers.Group |
                 Group-Object SamAccountName | Where-Object { $_.Count -ge 2 }
             ) {
                 $ExcelParams = @{
@@ -338,7 +343,7 @@ Process {
 
         $MailParams.Message = "<p>Within SCCM we found <b>$(@($ProductNamesAll).count) unique software packages</b> installed on <b>$(@($Computers).count) enabled AD computers</b>, regardless of the product version.</p>"
 
-        $MailParams.Message += $ADComputers | 
+        $MailParams.Message += $ADComputers |
         Group-Object 'DeviceType', 'AD OS' |
         Select-Object @{N = 'AD OS'; E = { $_.Group[0].'AD OS' } },
         @{N = 'DeviceType'; E = { $_.Group[0].DeviceType } },
@@ -348,7 +353,7 @@ Process {
 
         $MailParams.Message += "<p><i>* Check the attachment for details</i></p>"
 
-        $MailParams.Message += $OUs | ConvertTo-OuNameHC -OU | Sort-Object | 
+        $MailParams.Message += $OUs | ConvertTo-OuNameHC -OU | Sort-Object |
         ConvertTo-HtmlListHC -Header 'Organizational units:'
 
         Get-ScriptRuntimeHC -Stop
