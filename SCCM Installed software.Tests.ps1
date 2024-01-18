@@ -98,22 +98,10 @@ Describe 'Prerequisites' {
             .$testScript @testNewParams
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                (&$MailAdminParams) -and ($Message -like "Cannot find path*")
+                (&$MailAdminParams) -and ($Message -like "*Cannot find path*")
             }
         }
-        It 'OU missing' {
-            $testNewImportFile = Copy-ObjectHC $testImportFile
-            $testNewImportFile.AD.OU = @()
-
-            $testNewImportFile | ConvertTo-Json | Out-File @testOutParams
-
-            .$testScript @testParams
-
-            Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                (&$MailAdminParams) -and ($Message -like "*No 'AD.OU' found*")
-            }
-        }
-        It 'MailTo missing' {
+        It 'MailTo not found' {
             $testNewImportFile = Copy-ObjectHC $testImportFile
             $testNewImportFile.MailTo = @()
 
@@ -122,7 +110,31 @@ Describe 'Prerequisites' {
             .$testScript @testParams
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                (&$MailAdminParams) -and ($Message -like "*No 'MailTo' addresses found*")
+                (&$MailAdminParams) -and ($Message -like "*'MailTo' not found*")
+            }
+        }
+        It 'AD.OU not found' {
+            $testNewImportFile = Copy-ObjectHC $testImportFile
+            $testNewImportFile.AD.OU = @()
+
+            $testNewImportFile | ConvertTo-Json | Out-File @testOutParams
+
+            .$testScript @testParams
+
+            Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
+                (&$MailAdminParams) -and ($Message -like "*'AD.OU' not found*")
+            }
+        }
+        It 'AD.IncludeServers not a boolean' {
+            $testNewImportFile = Copy-ObjectHC $testImportFile
+            $testNewImportFile.AD.IncludeServers = $null
+
+            $testNewImportFile | ConvertTo-Json | Out-File @testOutParams
+
+            .$testScript @testParams
+
+            Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
+                (&$MailAdminParams) -and ($Message -like "*'AD.IncludeServers' is not a boolean value*")
             }
         }
     }

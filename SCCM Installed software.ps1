@@ -55,21 +55,26 @@ Begin {
         #endregion
 
         #region Import input file
-        $File = Get-Content $ImportFile -Raw -EA Stop | ConvertFrom-Json
-
-        if (-not ($MailTo = $File.MailTo)) {
-            throw "Input file '$ImportFile': No 'MailTo' addresses found."
-        }
-
-        if (-not ($OUs = $File.AD.OU)) {
-            throw "Input file '$ImportFile': No 'AD.OU' found."
-        }
-
         try {
-            $IncludeServers = [Boolean]::Parse($file.AD.IncludeServers)
+            $File = Get-Content $ImportFile -Raw -EA Stop | ConvertFrom-Json
+
+            if (-not ($MailTo = $File.MailTo)) {
+                throw "Property 'MailTo' not found."
+            }
+
+            if (-not ($OUs = $File.AD.OU)) {
+                throw "Property 'AD.OU' not found."
+            }
+
+            try {
+                $IncludeServers = [Boolean]::Parse($file.AD.IncludeServers)
+            }
+            catch {
+                throw "Property 'AD.IncludeServers' is not a boolean value"
+            }
         }
         catch {
-            throw "Property 'AD.IncludeServers' is not a boolean value"
+            throw "Input file '$ImportFile': $_"
         }
         #endregion
 
