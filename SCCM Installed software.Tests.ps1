@@ -5,7 +5,8 @@ BeforeAll {
     $testImportFile = @{
         MailTo = 'bob@contoso.com'
         AD     = @{
-            OU = @('OU=EU,DC=contoso,DC=net')
+            IncludeServers = $true
+            OU             = @('OU=EU,DC=contoso,DC=net')
         }
     }
 

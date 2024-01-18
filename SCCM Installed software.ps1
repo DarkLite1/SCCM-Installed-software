@@ -64,6 +64,13 @@ Begin {
         if (-not ($OUs = $File.AD.OU)) {
             throw "Input file '$ImportFile': No 'AD.OU' found."
         }
+
+        try {
+            $IncludeServers = [Boolean]::Parse($file.AD.IncludeServers)
+        }
+        catch {
+            throw "Property 'AD.IncludeServers' is not a boolean value"
+        }
         #endregion
 
         $MachineFolder = New-Item -Path "$LogFile - Machines" -ItemType Directory
@@ -87,8 +94,15 @@ Begin {
 
 Process {
     Try {
-        $Computers = Get-ADComputerHC -OU $OUs -EA Stop |
-        Where-Object { $_.Enabled }
+        $Computers = Get-ADComputerHC -OU $OUs -EA Stop | Where-Object {
+            $_.Enabled
+        }
+
+        if (-not $IncludeServers) {
+            $Computers = $Computers | Where-Object {
+                $_.OS -notLike '*server*'
+            }
+        }
 
         Write-EventLog @EventVerboseParams -Message "$(@($Computers).count) enabled computers found in AD"
 
