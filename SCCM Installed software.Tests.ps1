@@ -2,10 +2,12 @@
 #Requires -Version 5.1
 
 BeforeAll {
-    $testImportFile = @"
-MailTo: Brecht.Gijbels@heidelbergcement.com
-OU=XXX,OU=EU,DC=contoso,DC=net
-"@
+    $testImportFile = @{
+        MailTo = 'bob@contoso.com'
+        AD     = @{
+            OU = @('OU=EU,DC=contoso,DC=net')
+        }
+    }
 
     $testADComputers = @(
         [PSCustomObject]@{
@@ -60,7 +62,7 @@ OU=XXX,OU=EU,DC=contoso,DC=net
     )
 
     $testOutParams = @{
-        FilePath = (New-Item 'TestDrive:/Test.txt' -ItemType File).FullName
+        FilePath = (New-Item 'TestDrive:/Test.json' -ItemType File).FullName
         Encoding = 'utf8'
     }
 
@@ -74,10 +76,10 @@ OU=XXX,OU=EU,DC=contoso,DC=net
     }
 
     $MailAdminParams = {
-        ($To -eq $testParams.ScriptAdmin) -and ($Priority -eq 'High') -and 
+        ($To -eq $testParams.ScriptAdmin) -and ($Priority -eq 'High') -and
         ($Subject -eq 'FAILURE')
     }
-  
+
     Mock Get-ADComputerHC
     Mock Get-SCCMHardwareHC
     Mock Get-SCCMPrimaryDeviceUsersHC
@@ -88,26 +90,6 @@ OU=XXX,OU=EU,DC=contoso,DC=net
 
 Describe 'Prerequisites' {
     Context 'ImportFile' {
-        It 'skip comments' {
-            @"
-MailTo: Brecht.Gijbels@heidelbergcement.com
-# comment
-# comment
-OU=XXX,OU=EU,DC=contoso,DC=net
-# Comment
-"@ | Out-File @testOutParams
-            .$testScript @testParams
-
-            $Expected = @(
-                'MailTo: Brecht.Gijbels@heidelbergcement.com'
-                'OU=XXX,OU=EU,DC=contoso,DC=net'
-            )
-
-            $File | Should -BeExactly $Expected
-        } 
-        It 'mandatory parameter' {
-            (Get-Command $testScript).Parameters['ImportFile'].Attributes.Mandatory | Should -Be $true
-        } 
         It 'file not found' {
             $testNewParams = $testParams.Clone()
             $testNewParams.ImportFile = 'NotExisting.txt'
@@ -117,48 +99,50 @@ OU=XXX,OU=EU,DC=contoso,DC=net
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
                 (&$MailAdminParams) -and ($Message -like "Cannot find path*")
             }
-        } 
+        }
         It 'OU missing' {
-            @"
-MailTo: Brecht.Gijbels@heidelbergcement.com
-"@ | Out-File @testOutParams
+            $testNewImportFile = Copy-ObjectHC $testImportFile
+            $testNewImportFile.AD.OU = @()
+
+            $testNewImportFile | ConvertTo-Json | Out-File @testOutParams
 
             .$testScript @testParams
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                (&$MailAdminParams) -and ($Message -like "*No organizational units found*")
+                (&$MailAdminParams) -and ($Message -like "*No 'AD.OU' found*")
             }
-        } 
+        }
         It 'MailTo missing' {
-            @"
-OU=XXX,OU=EU,DC=contoso,DC=net
-"@ | Out-File @testOutParams
+            $testNewImportFile = Copy-ObjectHC $testImportFile
+            $testNewImportFile.MailTo = @()
+
+            $testNewImportFile | ConvertTo-Json | Out-File @testOutParams
 
             .$testScript @testParams
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                (&$MailAdminParams) -and ($Message -like "*No 'MailTo' found*")
+                (&$MailAdminParams) -and ($Message -like "*No 'MailTo' addresses found*")
             }
-        } 
+        }
     }
     Context 'LogFolder' {
         It 'folder not found' {
+            $testImportFile | ConvertTo-Json | Out-File @testOutParams
+
             $testNewParams = $testParams.Clone()
             $testNewParams.LogFolder = 'x:\NonExisting'
 
-            $testImportFile | Out-File @testOutParams
-          
             .$testScript @testNewParams
 
             Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
                 (&$MailAdminParams) -and ($Message -like "*Failed creating the log folder 'x:\NonExisting'*")
             }
-        } 
+        }
     }
 }
 Describe 'export Excel files' {
     BeforeAll {
-        $testImportFile | Out-File @testOutParams
+        $testImportFile | ConvertTo-Json | Out-File @testOutParams
     }
     BeforeEach {
         Remove-Item "$($testParams.LogFolder)\*" -Recurse -Force -EA Ignore
@@ -173,14 +157,14 @@ Describe 'export Excel files' {
 
         .$testScript @testParams
 
-        $testMachines = @($testInstalledSoftware.ComputerName | 
+        $testMachines = @($testInstalledSoftware.ComputerName |
             Sort-Object -Unique).Count
 
         $testMachines | Should -Not -BeExactly 0
 
         Get-ChildItem $testParams.LogFolder -Recurse -Directory |
         Where-Object { $_.Name -like '*Machines' } | Get-ChildItem -File |
-        Where-Object { 
+        Where-Object {
             $testInstalledSoftware.ComputerName -contains $_.BaseName
         } |
         Should -HaveCount $testMachines
@@ -199,7 +183,7 @@ Describe 'export Excel files' {
 
         Get-ChildItem $testParams.LogFolder -Recurse |
         Where-Object { $_.Name -like "*SCCM installed software.xlsx" } | Should -HaveCount 1
-    } 
+    }
     It 'one file for all AD computers' {
         Mock Get-ADComputerHC {
             $testADComputers
@@ -214,11 +198,11 @@ Describe 'export Excel files' {
 
         Get-ChildItem $testParams.LogFolder -Recurse |
         Where-Object { $_.Name -like "*SCCM AD computers overview.xlsx" } | Should -HaveCount 1
-    } 
+    }
 }
 Describe 'send mail' {
     BeforeAll {
-        $testImportFile | Out-File @testOutParams
+        $testImportFile | ConvertTo-Json | Out-File @testOutParams
     }
     BeforeEach {
         Remove-Item "$($testParams.LogFolder)\*" -Recurse -Force -EA Ignore
@@ -242,5 +226,5 @@ Describe 'send mail' {
         Should -Invoke Send-MailHC -Times 1 -Exactly -ParameterFilter {
             (@($Attachments).Count -eq 2)
         }
-    } 
+    }
 }

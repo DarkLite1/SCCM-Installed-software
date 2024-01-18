@@ -8,7 +8,7 @@
         Report about all computers found in AD and their software.
 
     .DESCRIPTION
-        The AD is queried  to retrieve all computer names and properties. This
+        The AD is queried to retrieve all computer names and properties. This
         list is then used to query SCCM to find out the software installed on
         these machines.
 
@@ -39,15 +39,15 @@ Begin {
         Write-EventLog @EventStartParams
         Get-ScriptRuntimeHC -Start
 
-        #region Import file and vars
-        $File = Get-Content $ImportFile -EA Stop | Remove-CommentsHC
+        #region Import input file
+        $File = Get-Content $ImportFile -Raw -EA Stop | ConvertFrom-Json
 
-        if (-not ($MailTo = $File | Get-ValueFromArrayHC MailTo -Delimiter ',')) {
-            throw "No 'MailTo' found in the input file."
+        if (-not ($MailTo = $File.MailTo)) {
+            throw "Input file '$ImportFile': No 'MailTo' addresses found."
         }
 
-        if (-not ($OUs = $File | Get-ValueFromArrayHC -Exclude MailTo)) {
-            throw "No organizational units found in the input file."
+        if (-not ($OUs = $File.AD.OU)) {
+            throw "Input file '$ImportFile': No 'AD.OU' found."
         }
         #endregion
 
@@ -79,7 +79,7 @@ Begin {
     }
     Catch {
         Write-Warning $_
-        Send-MailHC -To $ScriptAdmin -Subject FAILURE -Priority High -Message $_  -Header $ScriptName
+        Send-MailHC -To $ScriptAdmin -Subject 'FAILURE' -Priority 'High' -Message $_ -Header $ScriptName
         Write-EventLog @EventErrorParams -Message "FAILURE:`n`n- $_"
         Write-EventLog @EventEndParams; Exit 1
     }
@@ -362,7 +362,7 @@ Process {
     }
     Catch {
         Write-Warning $_
-        Send-MailHC -To $ScriptAdmin -Subject FAILURE -Priority High -Message $_  -Header $ScriptName
+        Send-MailHC -To $ScriptAdmin -Subject 'FAILURE' -Priority 'High' -Message $_  -Header $ScriptName
         Write-EventLog @EventErrorParams -Message "FAILURE:`n`n- $_"
         Exit 1
     }
